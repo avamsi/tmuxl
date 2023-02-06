@@ -211,5 +211,4 @@ func main() {
 		fmt.Fprintln(os.Stderr, "tmuxl: expected at most 1 argument, got", args)
 		os.Exit(1)
 	}
-	fmt.Println()
 }
