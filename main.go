@@ -5,11 +5,9 @@ import (
 	"os"
 	"os/exec"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/avamsi/ergo"
-	"golang.org/x/term"
 )
 
 func max(a, b int) int {
@@ -22,23 +20,21 @@ func max(a, b int) int {
 func tmux(args ...string) string {
 	cmd := exec.Command("tmux", args...)
 	// Let tmux chill between multiple commands.
-	time.Sleep(420 * time.Millisecond)
+	time.Sleep(42 * time.Millisecond)
 	return string(ergo.Must1(cmd.CombinedOutput()))
 }
 
-func numPanes() int {
-	out := tmux("display-message", "-p", "#{window_panes}")
-	return ergo.Must1(strconv.Atoi(strings.TrimSpace(out)))
+func currentLayout() (width, height, panes int) {
+	f := "[#{window_width}x#{window_height}:#{window_panes}]"
+	s := tmux("display-message", "-p", f)
+	ergo.Must1(fmt.Sscanf(s, "[%dx%d:%d]", &width, &height, &panes))
+	return
 }
 
-func createPane() {
-	if s := tmux("split-window", "-dc", "#{pane_current_path}"); s != "" {
-		panic(s)
-	}
-}
-
-func toggleFullscreen() {
-	if s := tmux("resize-pane", "-Z"); s != "" {
+func createPane(idx int) {
+	i := fmt.Sprintf("%d", idx)
+	s := tmux("split-window", "-c", "#{pane_current_path}", "-d", "-t", i)
+	if s != "" {
 		panic(s)
 	}
 }
@@ -173,22 +169,28 @@ func selectLayout(layout string) {
 	}
 }
 
-func adjustLayout(current, desired int) {
-	if desired > 5 {
-		fmt.Fprintln(os.Stderr, "tmuxl: expected at most 5 panes, got", desired)
+func adjustLayout(desired int) {
+	width, height, current := currentLayout()
+	if desired == 0 {
+		desired = current
+	} else if desired < current {
+		fmt.Fprintf(os.Stderr,
+			"tmuxl: expected n(=%d) to be >= current(=%d)\n", desired, current)
 		os.Exit(1)
 	}
 	for i := current; i < desired; i++ {
-		createPane()
-	}
-	width, height := ergo.Must2(term.GetSize(int(os.Stdin.Fd())))
-	if desired > 1 {
-		// Given there's more than one pane, there's a chance the pane we're on
-		// is not fullscreen, so toggle fullscreen and get max size of the 2.
-		toggleFullscreen()
-		w, h := ergo.Must2(term.GetSize(int(os.Stdin.Fd())))
-		width, height = max(width, w), max(height, h)
-		toggleFullscreen()
+		var idx int
+		switch i {
+		case 1, 3:
+			// 2nd and 4th panes are split from the 1st (idx=0) pane.
+			idx = 0
+		case 2, 4:
+			// 3rd pane is split from the 2nd (idx=1) pane.
+			// 5th pane is split from the 4th pane but it's idx will be 1 as
+			// tmux indices are incremented left to right and top to bottom.
+			idx = 1
+		}
+		createPane(idx)
 	}
 	selectLayout(computeLayout(width, height, desired))
 }
@@ -196,17 +198,14 @@ func adjustLayout(current, desired int) {
 func main() {
 	switch args := os.Args[1:]; len(args) {
 	case 0:
-		n := numPanes()
-		adjustLayout(n, n)
+		adjustLayout(0)
 	case 1:
-		c := numPanes()
-		d := ergo.Must1(strconv.Atoi(args[0]))
-		if d < c {
-			fmt.Fprintf(os.Stderr,
-				"tmuxl: expected desired(=%d) to be >= current(=%d)\n", d, c)
+		n := ergo.Must1(strconv.Atoi(args[0]))
+		if n <= 0 || n > 5 {
+			fmt.Fprintf(os.Stderr, "tmuxl: expected 0 < n(=%d) <= 5\n", n)
 			os.Exit(1)
 		}
-		adjustLayout(c, d)
+		adjustLayout(n)
 	default:
 		fmt.Fprintln(os.Stderr, "tmuxl: expected at most 1 argument, got", args)
 		os.Exit(1)
