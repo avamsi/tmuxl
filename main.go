@@ -154,10 +154,10 @@ func computeLayout(width, height, n int) string {
 
 // From https://github.com/tmux/tmux/blob/493922dc4b15/layout-custom.c#L47.
 func layoutChecksum(layout string) string {
-	csum := 0
+	csum := uint16(0)
 	for _, b := range []byte(layout) {
 		csum = (csum >> 1) + ((csum & 1) << 15)
-		csum += int(b)
+		csum += uint16(b)
 	}
 	return fmt.Sprintf("%04x", csum)
 }
