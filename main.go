@@ -19,8 +19,9 @@ func max(a, b int) int {
 
 func tmux(args ...string) string {
 	cmd := exec.Command("tmux", args...)
-	// Let tmux chill between multiple commands.
-	time.Sleep(42 * time.Millisecond)
+	// Let tmux chill a little bit between multiple commands
+	// (this seems to help with clean prompt rendering).
+	time.Sleep(250 * time.Millisecond)
 	return string(ergo.Must1(cmd.CombinedOutput()))
 }
 
