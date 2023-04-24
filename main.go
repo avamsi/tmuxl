@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/avamsi/ergo"
+	"github.com/avamsi/ergo/check"
 )
 
 func max(a, b int) int {
@@ -22,13 +22,13 @@ func tmux(args ...string) string {
 	// Let tmux chill a little bit between multiple commands
 	// (this seems to help with clean prompt rendering).
 	time.Sleep(250 * time.Millisecond)
-	return string(ergo.Must1(cmd.CombinedOutput()))
+	return string(check.Ok(cmd.CombinedOutput()))
 }
 
 func currentLayout() (width, height, panes int) {
 	f := "[#{window_width}x#{window_height}:#{window_panes}]"
 	s := tmux("display-message", "-p", f)
-	ergo.Must1(fmt.Sscanf(s, "[%dx%d:%d]", &width, &height, &panes))
+	check.Ok(fmt.Sscanf(s, "[%dx%d:%d]", &width, &height, &panes))
 	return
 }
 
@@ -201,7 +201,7 @@ func main() {
 	case 0:
 		adjustLayout(0)
 	case 1:
-		n := ergo.Must1(strconv.Atoi(args[0]))
+		n := check.Ok(strconv.Atoi(args[0]))
 		if n <= 0 || n > 5 {
 			fmt.Fprintf(os.Stderr, "tmuxl: expected 0 < n(=%d) <= 5\n", n)
 			os.Exit(1)
