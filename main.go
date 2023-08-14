@@ -14,8 +14,8 @@ import (
 
 const tmuxCoolOff = 250 * time.Millisecond
 
-func tmux(args ...string) string {
-	cmd := exec.Command("tmux", args...)
+func tmux(ctx context.Context, args ...string) string {
+	cmd := exec.CommandContext(ctx, "tmux", args...)
 	cmd.Stderr = os.Stderr
 	// Let tmux chill a little bit between multiple commands
 	// (this seems to help with clean prompt rendering).
@@ -23,16 +23,16 @@ func tmux(args ...string) string {
 	return string(check.Ok(cmd.Output()))
 }
 
-func currentLayout() (width, height, panes int) {
+func currentLayout(ctx context.Context) (width, height, panes int) {
 	f := "[#{window_width}x#{window_height}:#{window_panes}]"
-	s := tmux("display-message", "-p", f)
+	s := tmux(ctx, "display-message", "-p", f)
 	check.Ok(fmt.Sscanf(s, "[%dx%d:%d]", &width, &height, &panes))
 	return
 }
 
-func createPane(idx int) {
+func createPane(ctx context.Context, idx int) {
 	i := fmt.Sprintf("%d", idx)
-	s := tmux("split-window", "-c", "#{pane_current_path}", "-d", "-t", i)
+	s := tmux(ctx, "split-window", "-c", "#{pane_current_path}", "-d", "-t", i)
 	if s != "" {
 		panic(s)
 	}
@@ -161,9 +161,9 @@ func layoutChecksum(layout string) string {
 	return fmt.Sprintf("%04x", csum)
 }
 
-func selectLayout(layout string) {
+func selectLayout(ctx context.Context, layout string) {
 	layout = fmt.Sprintf("%s,%s", layoutChecksum(layout), layout)
-	if s := tmux("select-layout", layout); s != "" {
+	if s := tmux(ctx, "select-layout", layout); s != "" {
 		panic(s)
 	}
 }
@@ -186,8 +186,7 @@ func adjustLayout(ctx context.Context, desired int) {
 		// Give some time for tmux to attach to a session.
 		time.Sleep(tmuxCoolOff)
 	}
-	check.Nil(ctx.Err())
-	width, height, current := currentLayout()
+	width, height, current := currentLayout(ctx)
 	if desired == 0 {
 		desired = current
 	} else if desired < current {
@@ -207,11 +206,9 @@ func adjustLayout(ctx context.Context, desired int) {
 			// tmux indices are incremented left to right and top to bottom.
 			idx = 1
 		}
-		check.Nil(ctx.Err())
-		createPane(idx)
+		createPane(ctx, idx)
 	}
-	check.Nil(ctx.Err())
-	selectLayout(computeLayout(width, height, desired))
+	selectLayout(ctx, computeLayout(width, height, desired))
 }
 
 func main() {
