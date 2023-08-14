@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/avamsi/ergo/check"
+	"github.com/avamsi/ergo/assert"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -20,13 +20,13 @@ func tmux(ctx context.Context, args ...string) string {
 	// Let tmux chill a little bit between multiple commands
 	// (this seems to help with clean prompt rendering).
 	time.Sleep(tmuxCoolOff)
-	return string(check.Ok(cmd.Output()))
+	return string(assert.Ok(cmd.Output()))
 }
 
 func currentLayout(ctx context.Context) (width, height, panes int) {
 	f := "[#{window_width}x#{window_height}:#{window_panes}]"
 	s := tmux(ctx, "display-message", "-p", f)
-	check.Ok(fmt.Sscanf(s, "[%dx%d:%d]", &width, &height, &panes))
+	assert.Ok(fmt.Sscanf(s, "[%dx%d:%d]", &width, &height, &panes))
 	return
 }
 
@@ -171,7 +171,7 @@ func selectLayout(ctx context.Context, layout string) {
 func adjustLayout(ctx context.Context, desired int) {
 	g, ctx := errgroup.WithContext(ctx)
 	defer func() {
-		check.Nil(g.Wait())
+		assert.Nil(g.Wait())
 	}()
 	// Attach to a tmux session if we're not already under one.
 	if _, ok := os.LookupEnv("TMUX"); !ok {
@@ -180,7 +180,6 @@ func adjustLayout(ctx context.Context, desired int) {
 			cmd.Stdin = os.Stdin
 			cmd.Stdout = os.Stdout
 			cmd.Stderr = os.Stderr
-			cmd.Env = os.Environ()
 			return cmd.Run()
 		})
 		// Give some time for tmux to attach to a session.
@@ -209,7 +208,7 @@ func adjustLayout(ctx context.Context, desired int) {
 		createPane(ctx, idx)
 	}
 	selectLayout(ctx, computeLayout(width, height, desired))
-	// Focus the bottom left pane (for jjw).
+	// Focus the bottom left pane when possible (for jjw).
 	if current < 3 && desired >= 3 {
 		tmux(ctx, "select-pane", "-t", strconv.Itoa(desired-2))
 	}
@@ -221,9 +220,9 @@ func main() {
 	case 0:
 		adjustLayout(ctx, 0)
 	case 1:
-		n := check.Ok(strconv.Atoi(args[0]))
-		if n <= 0 || n > 5 {
-			fmt.Fprintf(os.Stderr, "tmuxl: expected 0 < n(=%d) <= 5\n", n)
+		n, err := strconv.Atoi(args[0])
+		if err != nil || n <= 0 || n > 5 {
+			fmt.Fprintf(os.Stderr, "tmuxl: expected 0 < n(=%s) <= 5\n", args[0])
 			return
 		}
 		adjustLayout(ctx, n)
