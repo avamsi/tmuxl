@@ -1,2 +1,4 @@
 github.com/avamsi/ergo v0.0.0-20230719202949-192c6ad84dcc h1:uP9/QqK4HtyKGHkkEJ8AAl6xqwCJ29PAudXtXhgNaZs=
 github.com/avamsi/ergo v0.0.0-20230719202949-192c6ad84dcc/go.mod h1:0mfFMF4gcydxZBrgNqByISJqS9TsgzJIbkwnQFDeY3U=
+golang.org/x/sync v0.3.0 h1:ftCYgMx6zT/asHUrPw8BLLscYtGznsLAnjq5RH9P66E=
+golang.org/x/sync v0.3.0/go.mod h1:FU7BRWz2tNW+3quACPkgCx/L+uEAv1htQ0V83Z9Rj+Y=

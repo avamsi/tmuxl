@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -8,21 +9,18 @@ import (
 	"time"
 
 	"github.com/avamsi/ergo/check"
+	"golang.org/x/sync/errgroup"
 )
 
-func max(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
-}
+const tmuxCoolOff = 250 * time.Millisecond
 
 func tmux(args ...string) string {
 	cmd := exec.Command("tmux", args...)
+	cmd.Stderr = os.Stderr
 	// Let tmux chill a little bit between multiple commands
 	// (this seems to help with clean prompt rendering).
-	time.Sleep(250 * time.Millisecond)
-	return string(check.Ok(cmd.CombinedOutput()))
+	time.Sleep(tmuxCoolOff)
+	return string(check.Ok(cmd.Output()))
 }
 
 func currentLayout() (width, height, panes int) {
@@ -170,14 +168,32 @@ func selectLayout(layout string) {
 	}
 }
 
-func adjustLayout(desired int) {
+func adjustLayout(ctx context.Context, desired int) {
+	g, ctx := errgroup.WithContext(ctx)
+	defer func() {
+		check.Nil(g.Wait())
+	}()
+	// Attach to a tmux session if we're not already under one.
+	if _, ok := os.LookupEnv("TMUX"); !ok {
+		g.Go(func() error {
+			cmd := exec.Command("tmux", "attach-session")
+			cmd.Stdin = os.Stdin
+			cmd.Stdout = os.Stdout
+			cmd.Stderr = os.Stderr
+			cmd.Env = os.Environ()
+			return cmd.Run()
+		})
+		// Give some time for tmux to attach to a session.
+		time.Sleep(tmuxCoolOff)
+	}
+	check.Nil(ctx.Err())
 	width, height, current := currentLayout()
 	if desired == 0 {
 		desired = current
 	} else if desired < current {
 		fmt.Fprintf(os.Stderr,
 			"tmuxl: expected n(=%d) to be >= current(=%d)\n", desired, current)
-		os.Exit(1)
+		return
 	}
 	for i := current; i < desired; i++ {
 		var idx int
@@ -191,24 +207,26 @@ func adjustLayout(desired int) {
 			// tmux indices are incremented left to right and top to bottom.
 			idx = 1
 		}
+		check.Nil(ctx.Err())
 		createPane(idx)
 	}
+	check.Nil(ctx.Err())
 	selectLayout(computeLayout(width, height, desired))
 }
 
 func main() {
+	ctx := context.Background()
 	switch args := os.Args[1:]; len(args) {
 	case 0:
-		adjustLayout(0)
+		adjustLayout(ctx, 0)
 	case 1:
 		n := check.Ok(strconv.Atoi(args[0]))
 		if n <= 0 || n > 5 {
 			fmt.Fprintf(os.Stderr, "tmuxl: expected 0 < n(=%d) <= 5\n", n)
-			os.Exit(1)
+			return
 		}
-		adjustLayout(n)
+		adjustLayout(ctx, n)
 	default:
 		fmt.Fprintln(os.Stderr, "tmuxl: expected at most 1 argument, got", args)
-		os.Exit(1)
 	}
 }
