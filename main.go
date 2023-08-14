@@ -31,7 +31,7 @@ func currentLayout(ctx context.Context) (width, height, panes int) {
 }
 
 func createPane(ctx context.Context, idx int) {
-	i := fmt.Sprintf("%d", idx)
+	i := strconv.Itoa(idx)
 	s := tmux(ctx, "split-window", "-c", "#{pane_current_path}", "-d", "-t", i)
 	if s != "" {
 		panic(s)
@@ -209,6 +209,10 @@ func adjustLayout(ctx context.Context, desired int) {
 		createPane(ctx, idx)
 	}
 	selectLayout(ctx, computeLayout(width, height, desired))
+	// Focus the bottom left pane (for jjw).
+	if current < 3 && desired >= 3 {
+		tmux(ctx, "select-pane", "-t", strconv.Itoa(desired-2))
+	}
 }
 
 func main() {
